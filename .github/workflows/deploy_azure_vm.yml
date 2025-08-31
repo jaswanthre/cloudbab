@@ -1,12 +1,8 @@
-# Alternative: Use latest versions of all actions
 name: Deploy to Azure VM
 
 on:
   push:
     branches: [ main, master ]
-
-permissions:
-  contents: read
 
 jobs:
   deploy:
@@ -16,16 +12,24 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup Node.js
+    - name: Setup Node.js for Backend
       uses: actions/setup-node@v4
       with:
         node-version: '18.x'
         cache: 'npm'
+        cache-dependency-path: 'basic-fullstack-app/server/package-lock.json'
 
     - name: Install backend dependencies
       run: |
         cd basic-fullstack-app/server
         npm ci --production
+
+    - name: Setup Node.js for Frontend
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+        cache-dependency-path: 'frontend/package-lock.json'
 
     - name: Install frontend dependencies and build
       run: |
@@ -38,8 +42,11 @@ jobs:
     - name: Create deployment package
       run: |
         mkdir -p deployment
+        # Copy backend
         cp -r basic-fullstack-app/server/ deployment/backend/
+        # Copy frontend build
         cp -r frontend/build/ deployment/frontend-build/
+        # Create archive
         tar -czf deployment.tar.gz deployment/
         echo "Deployment package created at $(date)" >> deploy.log
 
@@ -61,29 +68,53 @@ jobs:
         script: |
           cd /home/${{ secrets.AZURE_VM_USERNAME }}/deployments/
           tar -xzf deployment.tar.gz
-          echo "=== Deployment started at $(date) ===" >> deploy.log
           
-          # Backend deployment
+          echo "=== Starting deployment at $(date) ===" >> deploy.log
+          
+          # Deploy backend
+          echo "Deploying backend..." >> deploy.log
           cd deployment/backend
           npm install --production
           pm2 delete retail-backend 2>/dev/null || true
           pm2 start server.js --name retail-backend
           pm2 save
-          echo "Backend deployed" >> ../deploy.log
+          echo "Backend deployed successfully" >> ../deploy.log
           
-          # Frontend deployment
+          # Deploy frontend
+          echo "Deploying frontend..." >> ../deploy.log
           sudo rm -rf /home/azureuser/frontend-build
           sudo mv ../frontend-build /home/azureuser/
           sudo chown -R www-data:www-data /home/azureuser/frontend-build
           sudo chmod -R 755 /home/azureuser/frontend-build
-          echo "Frontend deployed" >> ../deploy.log
+          echo "Frontend deployed successfully" >> ../deploy.log
           
           # Restart NGINX
+          echo "Restarting NGINX..." >> ../deploy.log
           sudo systemctl restart nginx
-          echo "NGINX restarted" >> ../deploy.log
-          echo "=== Deployment completed at $(date) ===" >> ../deploy.log
+          echo "NGINX restarted successfully" >> ../deploy.log
+          
+          # Log deployment completion
+          echo "=== Deployment completed successfully at $(date) ===" >> ../deploy.log
 
-    - name: Download and upload deployment log
+    - name: Verify deployment
+      uses: appleboy/ssh-action@v0.1.10
+      with:
+        host: ${{ secrets.AZURE_VM_IP }}
+        username: ${{ secrets.AZURE_VM_USERNAME }}
+        key: ${{ secrets.AZURE_VM_SSH_KEY }}
+        script: |
+          cd /home/${{ secrets.AZURE_VM_USERNAME }}/deployments/
+          echo "=== Verification at $(date) ===" >> deploy.log
+          echo "=== Backend Status ===" >> deploy.log
+          pm2 status >> deploy.log
+          echo "=== NGINX Status ===" >> deploy.log
+          systemctl status nginx >> deploy.log
+          echo "=== Test API ===" >> deploy.log
+          curl -s http://localhost:5000/api/message >> deploy.log
+          echo "=== Frontend Files ===" >> deploy.log
+          ls -la /home/azureuser/frontend-build/ >> deploy.log
+
+    - name: Download deployment log
       uses: appleboy/scp-action@v0.1.4
       with:
         host: ${{ secrets.AZURE_VM_IP }}
@@ -92,8 +123,8 @@ jobs:
         source: "/home/${{ secrets.AZURE_VM_USERNAME }}/deployments/deploy.log"
         target: "."
 
-    - name: Upload deployment log artifact
+    - name: Upload deployment log as artifact
       uses: actions/upload-artifact@v4
       with:
-        name: deployment-log
+        name: deploy.log
         path: deploy.log
