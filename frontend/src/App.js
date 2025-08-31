@@ -1,18 +1,19 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
+import './App.css';
 
 function App() {
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
   const [sales, setSales] = useState([]);
 
-  const BASE_URL = "http://20.36.136.217/api";
+  const BASE_URL = "/api";
 
-useEffect(() => {
-  axios.get(`${BASE_URL}/customers`).then(res => setCustomers(res.data));
-  axios.get(`${BASE_URL}/products`).then(res => setProducts(res.data));
-  axios.get(`${BASE_URL}/sales`).then(res => setSales(res.data));
-}, []);
+  useEffect(() => {
+    axios.get(`${BASE_URL}/customers`).then(res => setCustomers(res.data));
+    axios.get(`${BASE_URL}/products`).then(res => setProducts(res.data));
+    axios.get(`${BASE_URL}/sales`).then(res => setSales(res.data));
+  }, []);
 
   return (
     <div style={{ padding: "20px" }}>
