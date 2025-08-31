@@ -6,16 +6,13 @@ function App() {
   const [products, setProducts] = useState([]);
   const [sales, setSales] = useState([]);
 
-  useEffect(() => {
-    axios.get("http://localhost:5000/api/customers")
-      .then(res => setCustomers(res.data));
+  const BASE_URL = "http://20.36.136.217/api";
 
-    axios.get("http://localhost:5000/api/products")
-      .then(res => setProducts(res.data));
-
-    axios.get("http://localhost:5000/api/sales")
-      .then(res => setSales(res.data));
-  }, []);
+useEffect(() => {
+  axios.get(`${BASE_URL}/customers`).then(res => setCustomers(res.data));
+  axios.get(`${BASE_URL}/products`).then(res => setProducts(res.data));
+  axios.get(`${BASE_URL}/sales`).then(res => setSales(res.data));
+}, []);
 
   return (
     <div style={{ padding: "20px" }}>

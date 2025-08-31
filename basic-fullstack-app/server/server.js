@@ -7,7 +7,6 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// Sample APIs for retail data
 app.get("/api/customers", (req, res) => {
   res.json([
     { id: 1, name: "John Doe" },
